@@ -1,0 +1,27 @@
+{
+  "name": "package",
+  "version": "1.0.0",
+  "description": "package.json config",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "nodemon app.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "nodemonConfig": {
+    "restartable": "rs",
+    "ignore": [
+      "node_modules/**/node_modules",
+      "db.json"
+    ],
+    "delay": "2500"
+  },
+  "dependencies": {
+    "ajv": "^6.12.6",
+    "dotenv": "^8.2.0",
+    "email-validator": "^2.0.4",
+    "express-validator": "^6.6.1",
+    "mongoose": "^5.10.8"
+  }
+}
