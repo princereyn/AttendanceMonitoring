@@ -4,15 +4,37 @@ const mongoose = require('mongoose');
 const { body, param, check, query, validationResult } = require('express-validator');
 const { validate, error } = require('../common/validate.js');
 
+const transform = (member) => {
+    console.log(member);
+    return {
+        _id: member._id,
+        name: member.name,
+        status: member.status,
+        joinedDate: member.joinedDate,
+        eventAttendances: member.attendances.map(obj => {
+            return {
+                eventName: obj.event.eventName,
+                timeIn: obj.timeIn,
+                timeOut: obj.timeOut
+            }
+        })
+    }
+};
+
 exports.getAllMembers = async (req, res) => {
-    const members = await MemberModel.find({});
-    res.send(members);
+    try {
+        const members = await MemberModel.find({});
+        res.send(members);
+    } catch (err) {
+        error(res, err);
+        next(err);
+    }
 };
 
 exports.getByMemberIdValidator = validate([
     check('id').custom(async (memberId) => {
         if (mongoose.Types.ObjectId.isValid(memberId)) {
-            const member = await MemberModel.findById(memberId);
+            const member = await MemberModel.findById(memberId)
             if (!member) throw new Error('Member does not exist!');            
         } else {
             throw new Error('Parameter has invalid Member Id!');
@@ -21,8 +43,14 @@ exports.getByMemberIdValidator = validate([
 ]);
 
 exports.getByMemberId = async (req, res) => {    
-    const member = await MemberModel.findById(req.params.id);
-    res.send(member);
+    try {
+        const member = await MemberModel.findById(req.params.id)
+            .populate({ path: 'attendances', populate: 'event' }); //TODO: Is there a way to transform by populate?
+        res.status(200).send(transform(member));
+    } catch (err) {
+        error(res, err);
+        next(err);
+    }
 };
 
 exports.insertMemberValidator = validate([

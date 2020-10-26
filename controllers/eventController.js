@@ -4,6 +4,25 @@ const mongoose = require('mongoose');
 const { body, param, check, query, validationResult } = require('express-validator');
 const { validate, error } = require('../common/validate.js');
 
+const transform = (event) => {
+    console.log(event);
+    return {
+        _id: event._id,
+        eventName: event.eventName,
+        eventType: event.eventType,
+        startDateTime: event.eventStartDate,
+        endDateTime: event.eventEndDate,
+        memberAttendances: event.attendances.map(obj => {
+            return {
+                memberId: obj.member._id,
+                name: obj.member.name,
+                timeIn: obj.timeIn,
+                timeOut: obj.timeOut
+            }
+        })
+    }
+};
+
 exports.getAllEvents = async (req, res) => {
     try {
         const events = await EventModel.find({});
@@ -28,32 +47,9 @@ exports.getByEventIdValidator = validate([
 exports.getByEventId = async (req, res) => {   
     try {
         const event = await EventModel.findById(req.params.id)
-            //.populate('attendances', ['attendanceId', 'timeIn', 'timeOut', 'member'])
-            .populate({
-                path: 'attendances',
-                model: 'Attendance',
-                select: ['timeIn', 'timeOut', 'member.name'],
-                // populate: { 
-                //     path: 'member', 
-                //     model: 'Member',
-                //     select: ['name', 'attendance.timeIn'],
-                //     // populate: { 
-                //     //     path: 'attendance', 
-                //     //     model: 'Attendance',
-                //     //     select: ['timeIn']
-                //     // }
-                // }
-              });
-            
-
-        // const event = await EventModel.aggregate([
-        //     { $match: { _id: req.params.id } },
-        //     { $lookup: { from: "memberAttendances", localField: "attendance", foreignField: "_id", as: "member"  } },
-        //     { $unwind: "$member" },
-        //     { $replaceRoot: { newRoot: "$member" } }
-        // ]);
-
-        res.send(event);
+            //.populate('attendances', ['timeIn', 'timeOut', 'member', 'event']);
+            .populate({ path: 'attendances', populate: 'member' }); //TODO: Is there a way to transform by populate?
+        res.status(200).send(transform(event));
     } catch (err) {
         error(res, err);
           next(err);
@@ -89,7 +85,7 @@ exports.insertEventValidator = validate([
         }),
     body('eventType').notEmpty().withMessage("eventType is required!"),
     check('eventStartDate').notEmpty().withMessage("eventStartDate is required!")
-        .not()
+        //.not()
         .custom((eventStartDate, { req }) => {
             const startDate = moment(eventStartDate, moment.ISO_8601, true);
             const endDate = moment(req.body.eventEndDate);

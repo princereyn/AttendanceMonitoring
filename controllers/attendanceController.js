@@ -6,30 +6,58 @@ const mongoose = require('mongoose');
 const { body, param, check, query, validationResult } = require('express-validator');
 const { validate, error } = require('../common/validate.js');
 
-// exports.insertAttendanceValidator = validate([
-//     body('eventName').notEmpty().withMessage("eventName is required!")
-//         .custom(async (eventName) => {
-//             const event = await EventModel.findOne({ eventName });            
-//             if (event) throw new Error('Event Name already in use!');            
-//         }),
-//     body('eventType').notEmpty().withMessage("eventType is required!"),
-//     check('eventStartDate').notEmpty().withMessage("eventStartDate is required!")
-//         .not()
-//         .custom((eventStartDate, { req }) => {
-//             const startDate = moment(eventStartDate, moment.ISO_8601, true);
-//             const endDate = moment(req.body.eventEndDate);
-//             if (!startDate.isValid()) {
-//                 throw new Error(`eventStartDate is not valid!`);
-//             } else if (startDate.diff(endDate) > 0) {
-//                 throw new Error(`Start date should be earlier than end date!`);
-//             }
-//         }),
-//     check('eventEndDate').notEmpty().withMessage("eventEndDate is required!")
-//         .not()
-//         .custom((eventEndDate) => {
-//             if (!moment(eventEndDate, moment.ISO_8601, true).isValid()) throw new Error(`eventEndDate is not valid!`);
-//         })
-// ]);
+exports.insertAttendanceValidator = validate([
+    check('memberId').notEmpty().withMessage("memberId is required!")
+        .custom(async (memberId, { req }) => {            
+            const member = await MemberModel.findOne({ _id: memberId });            
+            if (member) { 
+                if (member.status === 'Inactive') { //TODO: Transform to enum?
+                    throw new Error('An inactive member cannot attend events!');
+                } else {
+                    const attendance = await AttendanceModel.findOne({ event: req.body.eventId, member: memberId });                                    
+                    if (attendance) throw new Error('You are already registered in this event!');            
+                }
+            } else {
+                throw new Error('Member not existing!');
+            }
+    }),
+    check('eventId').notEmpty().withMessage("eventId is required!")
+        .custom(async (eventId, { req }) => {
+            const event = await EventModel.findOne({ _id: eventId });
+            if (event) { 
+                const timeIn = moment(new Date(req.body.timeIn));
+                if (timeIn.diff(event.eventEndDate) > 0) {
+                    throw new Error(`The event has already finished!`);
+                }
+            } else {
+                throw new Error('Event not existing!');
+            }
+    }),
+    check('timeIn').notEmpty().withMessage("timeIn is required!")
+        .not()
+        .custom((timeIn, { req }) => {
+            const startDate = moment(new Date(timeIn));            
+            if (!startDate.isValid()) {
+                throw new Error(`timeIn is not valid!`);
+            }          
+        }),
+    check('timeOut')
+        .not()
+        .optional()
+        .custom((timeOut, { req }) => {            
+            const startDate = moment(new Date(req.body.timeIn));
+            const endDate = moment(new Date(timeOut));
+            console.log(startDate);
+            console.log(endDate);
+            console.log(endDate.isValid());
+            if (!endDate.isValid()) {
+                throw new Error(`timeOut is not valid!`);
+            } 
+            if (startDate.diff(endDate) > 0) {
+                throw new Error(`Time in should be earlier than time out!`);
+            }
+        })
+]);
   
 exports.insertAttendance = async (req, res) => {
     try {
@@ -59,32 +87,42 @@ exports.insertAttendance = async (req, res) => {
     }
 };
 
-// exports.updateAttendanceValidator = validate([
-//     body('eventId').notEmpty().withMessage("eventId is required!"),
-//     check('eventName').notEmpty().withMessage("eventName is required!")
-//         .custom(async (eventName, { req }) => {
-//             const event = await EventModel.findOne({ eventName, _id: { $ne: req.body.eventId } });  
-//             console.log(event);          
-//             if (event) throw new Error('Event Name already in use!');            
-//         }),
-//     body('eventType').notEmpty().withMessage("eventType is required!"),
-//     check('eventStartDate').notEmpty().withMessage("eventStartDate is required!")
-//         .not()
-//         .custom((eventStartDate) => {
-//             const startDate = moment(eventStartDate, moment.ISO_8601, true);
-//             const endDate = moment(req.body.eventEndDate);
-//             if (!startDate.isValid()) {
-//                 throw new Error(`eventStartDate is not valid!`);
-//             } else if (startDate.diff(endDate) > 0) {
-//                 throw new Error(`Start date should be earlier than end date!`);
-//             }
-//         }),
-//     check('eventEndDate').notEmpty().withMessage("eventEndDate is required!")
-//         .not()
-//         .custom((eventEndDate) => {
-//             if (!moment(eventEndDate, moment.ISO_8601, true).isValid()) throw new Error(`eventEndDate is not valid!`);
-//         })
-// ]);
+exports.updateAttendanceValidator = validate([
+    body('attendanceId').notEmpty().withMessage("attendanceId is required!"),
+    check('memberId').notEmpty().withMessage("memberId is required!")
+        .custom(async (memberId) => {            
+            const member = await MemberModel.findOne({ _id: memberId });            
+            if (!member) { 
+                throw new Error('Member not existing!');
+            }
+    }),
+    check('eventId').notEmpty().withMessage("eventId is required!")
+        .custom(async (eventId, { req }) => {
+            const event = await EventModel.findOne({ _id: eventId });
+            if (!event) {
+                throw new Error('Event not existing!');
+            }
+    }),
+    check('timeIn').notEmpty().withMessage("timeIn is required!")
+        .not()
+        .custom((timeIn, { req }) => {
+            const startDate = moment(new Date(timeIn));            
+            if (!startDate.isValid()) {
+                throw new Error(`timeIn is not valid!`);
+            }          
+        }),
+    check('timeOut')
+        .optional()
+        .custom((timeOut, { req }) => {            
+            const startDate = moment(new Date(req.body.timeIn));
+            const endDate = moment(new Date(timeOut));
+            if (!endDate.isValid()) {
+                throw new Error(`timeOut is not valid!`);
+            } else if (startDate.diff(endDate) > 0) {
+                throw new Error(`Time in should be earlier than time out!`);
+            }
+        })
+]);
   
 exports.updateAttendance = async (req, res) => {
     try {
