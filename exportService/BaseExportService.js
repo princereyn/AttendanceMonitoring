@@ -2,8 +2,10 @@ const { v4: uuidv4 } = require('uuid');
 const moment = require('moment');
 
 class BaseExportService {
-    constructor(fileExtension){
+    constructor(fileExtension, eventName, eventStartDate){
         this.fileExtension = fileExtension;
+        this.eventName = eventName;
+        this.eventStartDate = eventStartDate;
     }
 
     getOutputFilePath(fileName){
@@ -11,7 +13,7 @@ class BaseExportService {
     }
 
     getFileName(){
-        return `${moment(new Date()).format('MM_DD_YYYY')}_${uuidv4()}.${this.fileExtension}`;
+        return `${this.eventName}_${moment(new Date()).format('MM_DD_YYYY')}.${this.fileExtension}`;
     }
 }
 

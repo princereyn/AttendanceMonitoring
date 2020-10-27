@@ -2,6 +2,7 @@ const EventModel = require("../models/eventModel");
 const mongoose = require("mongoose");
 const { body, param, check, query, validationResult } = require("express-validator");
 const { validate, error, isDateValid, isDateRangeValid } = require("../common/validators.js");
+const ExcelExportService = require('../exportService/ExcelExportService');
 
 exports.getAllEvents = async (req, res, next) => {	
     await EventModel.find({})
@@ -181,4 +182,53 @@ exports.deleteEvent = async (req, res, next) => {
 		error(res, err);
 		next(err);
 	}
+};
+
+exports.exportEventAttendeesValidator = validate([
+    check("id")
+        .notEmpty().withMessage("eventId is required!")
+	    .custom(async (eventId) => {
+            if (mongoose.Types.ObjectId.isValid(eventId)) {
+                const event = await EventModel.findById(eventId);
+                if (!event) { 
+                    throw new Error(`Event does not exist!`);
+                }
+            } else {
+                throw new Error("Parameter has invalid Event Id!");
+            }
+	    }),
+]);
+
+exports.exportEventAttendees = async (req, res, next) => {
+	await EventModel.findById(req.params.id)
+		.populate({
+			path: "membersAttendance",
+			model: "Attendance",
+			select: "_id timeIn timeOut",
+			populate: {
+				path: "member",
+				model: "Member",
+				select: "_id name",
+			}
+		})
+		.exec(async function (err, event) {
+			if (err) {
+				error(res, err);
+				next(err);
+            }
+            const excelExportService = new ExcelExportService(event.eventName, event.eventStartDate);
+
+            const membersAttendance = event.membersAttendance
+                .map(attendance => {
+                    return {
+                        name: attendance.member.name,
+                        timeIn: attendance.timeIn,
+                        timeOut: attendance.timeOut
+                    }
+                })
+                .sort((a, b) => (a.timeIn > b.timeIn) ? 1 : -1)
+                
+            await excelExportService.export(membersAttendance, res);
+			//res.status(200).send(event);
+		});
 };
