@@ -7,7 +7,7 @@ router.get('/search', eventController.searchEventsValidator, eventController.sea
 router.get('/', eventController.getAllEvents);
 router.get('/:id', eventController.getByEventIdValidator, eventController.getByEventId);
 router.post('/', eventController.insertEventValidator, eventController.insertEvent);
-router.put('/', eventController.updateEventValidator, eventController.updateEvent);
-router.delete('/', eventController.deleteEventValidator, eventController.deleteEvent);
+router.put('/:id', eventController.updateEventValidator, eventController.updateEvent);
+router.delete('/:id', eventController.deleteEventValidator, eventController.deleteEvent);
 
 module.exports = router;

@@ -2,33 +2,27 @@ const MemberModel = require('../models/memberModel');
 const moment = require('moment');
 const mongoose = require('mongoose');
 const { body, param, check, query, validationResult } = require('express-validator');
-const { validate, error } = require('../common/validate.js');
+const { validate, error, isDateValid, isDateRangeValid, isMemberStatusValid } = require("../common/validators.js");
 
-const transform = (member) => {
-    console.log(member);
-    return {
-        _id: member._id,
-        name: member.name,
-        status: member.status,
-        joinedDate: member.joinedDate,
-        eventAttendances: member.attendances.map(obj => {
-            return {
-                eventName: obj.event.eventName,
-                timeIn: obj.timeIn,
-                timeOut: obj.timeOut
+exports.getAllMembers = async (req, res, next) => {
+    await MemberModel.find({})
+        .populate({
+            path: "eventsAttendance",
+            model: "Attendance",
+            select: "_id timeIn timeOut",
+            populate: {
+                path: "event",
+                model: "Event",
+                select: "_id eventName",
             }
         })
-    }
-};
-
-exports.getAllMembers = async (req, res) => {
-    try {
-        const members = await MemberModel.find({});
-        res.send(members);
-    } catch (err) {
-        error(res, err);
-        next(err);
-    }
+        .exec(function (err, members) {              
+            if (err) {
+                error(res, err);
+                next(err);
+            }
+            res.status(200).send(members);
+        });
 };
 
 exports.getByMemberIdValidator = validate([
@@ -42,84 +36,33 @@ exports.getByMemberIdValidator = validate([
     })
 ]);
 
-exports.getByMemberId = async (req, res) => {    
-    try {
-        const member = await MemberModel.findById(req.params.id)
-            .populate({ path: 'attendances', populate: 'event' }); //TODO: Is there a way to transform by populate?
-        res.status(200).send(transform(member));
-    } catch (err) {
-        error(res, err);
-        next(err);
-    }
-};
-
-exports.insertMemberValidator = validate([
-    body('name').notEmpty().withMessage("name is required!")
-        .custom(async (name) => {
-            const member = await MemberModel.findOne({ name });            
-            if (member) throw new Error('Name already in use!');            
-        }),
-    body('status').notEmpty().withMessage("status is required!"),
-    check('joinedDate').not().optional().custom((joinedDate) => {
-        if (!moment(joinedDate, moment.ISO_8601, true).isValid()) throw new Error(`joinedDate is not valid!`);
-    })
-]);
-
-exports.insertMember = async (req, res, next) => {
-    try {
-      const member = new MemberModel(req.body);
-      await member.save();
-      res.status(201).send('Member successfully created.');
-    } catch (err) {
-        error(res, err);
-        next(err);
-    }
-};
-
-exports.updateMemberValidator = validate([
-    body('memberId').notEmpty().withMessage("memberId is required!"),
-    body('name').notEmpty().withMessage("name is required!"),
-    body('status').notEmpty().withMessage("status is required!"),
-    check('joinedDate').not().optional().custom((joinedDate) => {
-        if (!moment(joinedDate, moment.ISO_8601, true).isValid()) throw new Error(`joinedDate is not valid!`);        
-    })
-]);
-
-exports.updateMember = async (req, res) => {
-    try {
-        await MemberModel.findOneAndUpdate({ _id: req.body.memberId }, req.body);
-        res.status(200).send('Member successfully updated.');
-    } catch (err) {
-        error(res, err);
-        next(err);
-    }
-};
-
-exports.deleteMemberValidator = validate([
-    body('memberId').notEmpty().withMessage("memberId is required!"),
-    check('memberId').custom(async (memberId) => {
-        if (mongoose.Types.ObjectId.isValid(memberId)) {
-            const member = await MemberModel.findById( memberId );
-            if (!member) throw new Error(`Member does not exist!`);            
-        } else {
-            throw new Error('Parameter has invalid Member Id!');
-        }
-    })
-]);
-
-exports.deleteMember = async (req, res, next) => {
-    try {  
-      await MemberModel.findByIdAndDelete({ _id: req.body.memberId });
-      res.status(200).send('Member successfully deleted.');
-    } catch (err) {
-        error(res, err);
-        next(err);
-    }
+exports.getByMemberId = async (req, res, next) => {    
+    await MemberModel.findById(req.params.id)
+        .populate({
+            path: "eventsAttendance",
+            model: "Attendance",
+            select: "_id timeIn timeOut",
+            populate: {
+                path: "event",
+                model: "Event",
+                select: "_id eventName",
+            }
+        })
+        .exec(function (err, members) {              
+            if (err) {
+                error(res, err);
+                next(err);
+            }
+            res.status(200).send(members);
+        });
 };
 
 exports.searchMembersValidator = validate([
-    query('name').notEmpty().withMessage("name is required param!"),
-    query('status').notEmpty().withMessage("status is required param!")    
+    query('name')
+        .notEmpty().withMessage("name is required!"),
+    query('status')
+        .notEmpty().withMessage("status is required!")
+        .custom(isMemberStatusValid).withMessage("status is not valid!"),
 ]);
 
 exports.searchMembers = async (req, res, next) => {    
@@ -134,5 +77,97 @@ exports.searchMembers = async (req, res, next) => {
         error(res, err);
         next(err);
     }
-}
-  
+};
+
+exports.insertMemberValidator = validate([
+    body('name')
+        .notEmpty().withMessage("name is required!")
+        .custom(async (name) => {
+            const member = await MemberModel.findOne({ name });            
+            if (member) throw new Error("Name already in use!");            
+        }),
+    body('status')
+        .notEmpty().withMessage("status is required!")
+        .custom(isMemberStatusValid).withMessage("status is not valid!"),
+    body('joinedDate')
+        .optional()
+        .custom(isDateValid).withMessage("joinedDate is not valid!")    
+]);
+
+exports.insertMember = async (req, res, next) => {
+    try {
+      const member = new MemberModel(req.body);
+      await member.save();
+      res.status(201).send('Member successfully created.');
+    } catch (err) {
+        error(res, err);
+        next(err);
+    }
+};
+
+exports.updateMemberValidator = validate([
+    check("id")
+        .notEmpty().withMessage("memberId is required!")
+        .custom(async (memberId) => {
+            if (mongoose.Types.ObjectId.isValid(memberId)) {
+                const member = await MemberModel.findById(memberId);
+                if (!member) throw new Error("Member does not exist!");
+            } else {
+                throw new Error("Parameter has invalid Member Id!");
+            }
+        }),
+    body('name')
+        .notEmpty().withMessage("name is required!")
+        .custom(async (name, { req }) => {
+            const member = await MemberModel.findOne({
+                name,
+                _id: { $ne: req.params.id },
+            });
+            if (member) throw new Error("Name already existing!");
+        }),
+    body('status')
+        .notEmpty().withMessage("status is required!")
+        .custom(isMemberStatusValid).withMessage("status is not valid!"),
+    body('joinedDate')
+        .optional()
+        .custom(isDateValid).withMessage("joinedDate is not valid!")
+]);
+
+exports.updateMember = async (req, res, next) => {
+    try {
+        await MemberModel.findOneAndUpdate({ _id: req.params.id }, req.body);
+        res.status(200).send('Member successfully updated.');
+    } catch (err) {
+        error(res, err);
+        next(err);
+    }
+};
+
+exports.deleteMemberValidator = validate([
+    check("id")
+        .notEmpty().withMessage("memberId is required!")
+	    .custom(async (memberId) => {
+            if (mongoose.Types.ObjectId.isValid(memberId)) {
+                const member = await MemberModel.findById(memberId);
+                if (!member) { 
+                    throw new Error(`Member does not exist!`)
+                } else {
+                    if (member.eventsAttendance.length > 0) {
+                        throw new Error(`Cannot delete a member with events attendance!`)
+                    }
+                }
+            } else {
+                throw new Error("Parameter has invalid Member Id!");
+            }
+	    })
+]);
+
+exports.deleteMember = async (req, res, next) => {
+    try {  
+      await MemberModel.findByIdAndDelete({ _id: req.params.id });
+      res.status(200).send('Member successfully deleted.');
+    } catch (err) {
+        error(res, err);
+        next(err);
+    }
+};

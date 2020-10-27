@@ -14,7 +14,7 @@ const memberSchema = new Schema({
       type: String,
       required: true
     },
-    attendances: [ { type: mongoose.Schema.Types.ObjectId, ref: 'Attendance' }]
+    eventsAttendance: [ { type: mongoose.Schema.Types.ObjectId, ref: 'Attendance' }]
 });
 
 memberSchema.virtual('memberId').get(function() {

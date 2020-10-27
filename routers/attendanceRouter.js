@@ -3,13 +3,10 @@ const attendanceController = require('../controllers/attendanceController');
 
 const router = express.Router();
 
+router.get('/', attendanceController.getAllAttendance);
+router.get('/:id', attendanceController.getByAttendanceIdValidator, attendanceController.getByAttendanceId);
 router.post('/', attendanceController.insertAttendanceValidator, attendanceController.insertAttendance);
-router.put('/', attendanceController.updateAttendanceValidator, attendanceController.updateAttendance);
-router.delete('/', attendanceController.deleteAttendance);
-
-// router.post('/', attendanceController.insertAttendanceValidator, attendanceController.insertAttendance);
-// router.put('/', attendanceController.updateAttendanceValidator, attendanceController.updateAttendance);
-// router.delete('/', attendanceController.deleteAttendanceValidator, attendanceController.deleteAttendance);
-
+router.put('/:id', attendanceController.updateAttendanceValidator, attendanceController.updateAttendance);
+router.delete('/:id', attendanceController.deleteAttendanceValidator, attendanceController.deleteAttendance);
 
 module.exports = router;

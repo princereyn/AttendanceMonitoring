@@ -4,10 +4,65 @@ const MemberModel = require('../models/memberModel');
 const moment = require('moment');
 const mongoose = require('mongoose');
 const { body, param, check, query, validationResult } = require('express-validator');
-const { validate, error } = require('../common/validate.js');
+const { validate, error, isDateValid, isDateRangeValid } = require("../common/validators.js");
+
+exports.getAllAttendance = async (req, res, next) => {
+    await AttendanceModel.find({})
+        .populate({
+            path: "member",
+            model: "Member",
+            select: "_id name status",
+        })
+        .populate({
+            path: "event",
+            model: "Event",
+            select: "_id eventName eventType",
+        })
+        .exec(function (err, attendance) {  
+            //err = new Error('test error');            
+            if (err) {
+                error(res, err);
+                next(err);
+            }
+            res.status(200).send(attendance);
+        });
+};
+
+exports.getByAttendanceIdValidator = validate([
+	check("id").custom(async (attendanceId) => {
+		if (mongoose.Types.ObjectId.isValid(attendanceId)) {
+			const attendance = await AttendanceModel.findById(attendanceId);
+			if (!attendance) throw new Error("Attendance does not exist!");
+		} else {
+			throw new Error("Parameter has invalid Attendance Id!");
+		}
+    })
+]);
+
+exports.getByAttendanceId = async (req, res, next) => {
+	await AttendanceModel.findById(req.params.id)
+        .populate({
+            path: "member",
+            model: "Member",
+            select: "_id name status",
+        })
+        .populate({
+            path: "event",
+            model: "Event",
+            select: "_id eventName eventType",
+        })
+		.exec(function (err, attendance) {
+			if (err) {
+				error(res, err);
+				next(err);
+			}
+			res.status(200).send(attendance);
+		});
+};
 
 exports.insertAttendanceValidator = validate([
-    check('memberId').notEmpty().withMessage("memberId is required!")
+    check('memberId')
+        .notEmpty().withMessage("memberId is required!")
         .custom(async (memberId, { req }) => {            
             const member = await MemberModel.findOne({ _id: memberId });            
             if (member) { 
@@ -21,7 +76,8 @@ exports.insertAttendanceValidator = validate([
                 throw new Error('Member not existing!');
             }
     }),
-    check('eventId').notEmpty().withMessage("eventId is required!")
+    check('eventId')
+        .notEmpty().withMessage("eventId is required!")
         .custom(async (eventId, { req }) => {
             const event = await EventModel.findOne({ _id: eventId });
             if (event) { 
@@ -33,33 +89,16 @@ exports.insertAttendanceValidator = validate([
                 throw new Error('Event not existing!');
             }
     }),
-    check('timeIn').notEmpty().withMessage("timeIn is required!")
-        .not()
-        .custom((timeIn, { req }) => {
-            const startDate = moment(new Date(timeIn));            
-            if (!startDate.isValid()) {
-                throw new Error(`timeIn is not valid!`);
-            }          
-        }),
-    check('timeOut')
-        .not()
+    check('timeIn')
+        .notEmpty().withMessage("timeIn is required!")
+        .custom(isDateValid).withMessage("timeIn not valid!")
+        .custom(isDateRangeValid).withMessage("timeIn should not be equal to or past timeOut!"),      
+    check('timeOut')        
         .optional()
-        .custom((timeOut, { req }) => {            
-            const startDate = moment(new Date(req.body.timeIn));
-            const endDate = moment(new Date(timeOut));
-            console.log(startDate);
-            console.log(endDate);
-            console.log(endDate.isValid());
-            if (!endDate.isValid()) {
-                throw new Error(`timeOut is not valid!`);
-            } 
-            if (startDate.diff(endDate) > 0) {
-                throw new Error(`Time in should be earlier than time out!`);
-            }
-        })
+        .custom(isDateValid).withMessage("timeOut is not valid!")
 ]);
   
-exports.insertAttendance = async (req, res) => {
+exports.insertAttendance = async (req, res, next) => {
     try {
         const { eventId, memberId, timeIn, timeOut } = req.body;
 
@@ -73,8 +112,8 @@ exports.insertAttendance = async (req, res) => {
             member: memberDoc._id
         });
 
-        eventDoc.attendances.push(attendance._id);
-        memberDoc.attendances.push(attendance._id);
+        eventDoc.membersAttendance.push(attendance._id);
+        memberDoc.eventsAttendance.push(attendance._id);
 
         await attendance.save();
         await eventDoc.save();
@@ -88,68 +127,64 @@ exports.insertAttendance = async (req, res) => {
 };
 
 exports.updateAttendanceValidator = validate([
-    body('attendanceId').notEmpty().withMessage("attendanceId is required!"),
-    check('memberId').notEmpty().withMessage("memberId is required!")
+    check("id")
+        .notEmpty().withMessage("attendanceId is required!")
+        .custom(async (attendanceId) => {
+            if (mongoose.Types.ObjectId.isValid(attendanceId)) {
+                const attendance = await AttendanceModel.findById(attendanceId);
+                if (!attendance) throw new Error("Attendance does not exist!");
+            } else {
+                throw new Error("Parameter has invalid Attendance Id!");
+            }
+        }),
+    check('memberId')
+        .notEmpty().withMessage("memberId is required!")
         .custom(async (memberId) => {            
             const member = await MemberModel.findOne({ _id: memberId });            
-            if (!member) { 
-                throw new Error('Member not existing!');
-            }
-    }),
-    check('eventId').notEmpty().withMessage("eventId is required!")
-        .custom(async (eventId, { req }) => {
-            const event = await EventModel.findOne({ _id: eventId });
-            if (!event) {
-                throw new Error('Event not existing!');
-            }
-    }),
-    check('timeIn').notEmpty().withMessage("timeIn is required!")
-        .not()
-        .custom((timeIn, { req }) => {
-            const startDate = moment(new Date(timeIn));            
-            if (!startDate.isValid()) {
-                throw new Error(`timeIn is not valid!`);
-            }          
+            if (!member) throw new Error('Member not existing!');
         }),
-    check('timeOut')
+    check('eventId')
+        .notEmpty().withMessage("eventId is required!")
+        .custom(async (eventId) => {
+            const event = await EventModel.findOne({ _id: eventId });
+            if (!event) throw new Error('Event not existing!');            
+        }),
+    check('timeIn')
+        .notEmpty().withMessage("timeIn is required!")
+        .custom(isDateValid).withMessage("timeIn not valid!")
+        .custom(isDateRangeValid).withMessage("timeIn should not be equal to or past timeOut!"),      
+    check('timeOut')        
         .optional()
-        .custom((timeOut, { req }) => {            
-            const startDate = moment(new Date(req.body.timeIn));
-            const endDate = moment(new Date(timeOut));
-            if (!endDate.isValid()) {
-                throw new Error(`timeOut is not valid!`);
-            } else if (startDate.diff(endDate) > 0) {
-                throw new Error(`Time in should be earlier than time out!`);
-            }
-        })
+        .custom(isDateValid).withMessage("timeOut is not valid!")
 ]);
   
-exports.updateAttendance = async (req, res) => {
+exports.updateAttendance = async (req, res, next) => {
     try {
-        await EventModel.findOneAndUpdate({ _id: req.body.eventId }, req.body);
-        res.status(200).send('Event successfully updated.');
+        await AttendanceModel.findOneAndUpdate({ _id: req.params.id }, req.body);
+        res.status(200).send('Attendance successfully updated.');
     } catch (err) {
         error(res, err);
         next(err);
     }
 };
 
-// exports.deleteAttendanceValidator = validate([
-//     body('eventId').notEmpty().withMessage("eventId is required!"),
-//     check('eventId').custom(async (eventId) => {
-//         if (mongoose.Types.ObjectId.isValid(eventId)) {
-//             const event = await EventModel.findById( eventId );
-//             if (!event) throw new Error(`Event does not exist!`);            
-//         } else {
-//             throw new Error('Parameter has invalid Event Id!');
-//         }
-//     })
-// ]);
+exports.deleteAttendanceValidator = validate([
+    check("id")
+        .notEmpty().withMessage("attendanceId is required!")
+        .custom(async (attendanceId) => {
+            if (mongoose.Types.ObjectId.isValid(attendanceId)) {
+                const attendance = await AttendanceModel.findById(attendanceId);
+                if (!attendance) throw new Error(`Attendance does not exist!`);                
+            } else {
+                throw new Error("Parameter has invalid Attendance Id!");
+            }
+	    }),
+]);
 
-exports.deleteAttendance = async (req, res) => {
+exports.deleteAttendance = async (req, res, next) => {
     try {
-        await EventModel.findByIdAndDelete({ _id: req.body.eventId });
-        res.status(200).send('Event successfully deleted.');
+        await AttendanceModel.findByIdAndDelete({ _id: req.params.id });
+        res.status(200).send('Attendance successfully deleted.');
     } catch (err) {
         error(res, err);
         next(err);

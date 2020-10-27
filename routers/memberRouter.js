@@ -7,7 +7,7 @@ router.get('/search', memberController.searchMembersValidator, memberController.
 router.get('/', memberController.getAllMembers);
 router.get('/:id', memberController.getByMemberIdValidator, memberController.getByMemberId);
 router.post('/', memberController.insertMemberValidator, memberController.insertMember);
-router.put('/', memberController.updateMemberValidator, memberController.updateMember);
-router.delete('/', memberController.deleteMemberValidator, memberController.deleteMember);
+router.put('/:id', memberController.updateMemberValidator, memberController.updateMember);
+router.delete('/:id', memberController.deleteMemberValidator, memberController.deleteMember);
 
 module.exports = router;
