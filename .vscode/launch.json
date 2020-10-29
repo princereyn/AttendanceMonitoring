@@ -4,8 +4,8 @@
         {
             "type": "pwa-chrome",
             "request": "launch",
-            "name": "Get All Users",
-            "url": "http://localhost:3000/users",
+            "name": "Get All Events",
+            "url": "http://localhost:3000/api/events/",
             "webRoot": "${workspaceFolder}"
         },
         {

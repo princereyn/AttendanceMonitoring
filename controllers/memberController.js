@@ -1,28 +1,28 @@
 const MemberModel = require('../models/memberModel');
-const moment = require('moment');
 const mongoose = require('mongoose');
-const { body, param, check, query, validationResult } = require('express-validator');
-const { validate, error, isDateValid, isDateRangeValid, isMemberStatusValid } = require("../common/validators.js");
+const { body, check, query } = require('express-validator');
+const { validate, error, isDateValid, isMemberStatusValid } = require("../common/validators.js");
 
 exports.getAllMembers = async (req, res, next) => {
-    await MemberModel.find({})
-        .populate({
-            path: "eventsAttendance",
-            model: "Attendance",
-            select: "_id timeIn timeOut",
-            populate: {
-                path: "event",
-                model: "Event",
-                select: "_id eventName",
-            }
-        })
-        .exec(function (err, members) {              
-            if (err) {
-                error(res, err);
-                next(err);
-            }
-            res.status(200).send(members);
-        });
+    try {
+        const members = await MemberModel.find({})
+            .populate({
+                path: "eventsAttendance",
+                model: "Attendance",
+                select: "_id timeIn timeOut",
+                populate: {
+                    path: "event",
+                    model: "Event",
+                    select: "_id eventName",
+                }
+            });
+        
+        res.status(200).send(members);
+    } catch (err) {
+        error(res, err);
+        next(err);
+    }
+    req.app.get('log').emit('logApiEvents', { req, res });
 };
 
 exports.getByMemberIdValidator = validate([
@@ -36,25 +36,25 @@ exports.getByMemberIdValidator = validate([
     })
 ]);
 
-exports.getByMemberId = async (req, res, next) => {    
-    await MemberModel.findById(req.params.id)
-        .populate({
-            path: "eventsAttendance",
-            model: "Attendance",
-            select: "_id timeIn timeOut",
-            populate: {
-                path: "event",
-                model: "Event",
-                select: "_id eventName",
-            }
-        })
-        .exec(function (err, members) {              
-            if (err) {
-                error(res, err);
-                next(err);
-            }
-            res.status(200).send(members);
-        });
+exports.getByMemberId = async (req, res, next) => {
+    try {
+        const member = await MemberModel.findById(req.params.id)
+            .populate({
+                path: "eventsAttendance",
+                model: "Attendance",
+                select: "_id timeIn timeOut",
+                populate: {
+                    path: "event",
+                    model: "Event",
+                    select: "_id eventName",
+                }
+            });
+        res.status(200).send(member);
+    } catch (err) {
+        error(res, err);
+        next(err);
+    }
+    req.app.get('log').emit('logApiEvents', { req, res });
 };
 
 exports.searchMembersValidator = validate([
@@ -70,6 +70,15 @@ exports.searchMembers = async (req, res, next) => {
         const members = await MemberModel.find({ 
             name: { $regex: new RegExp(req.query.name, 'i') }, 
             status: { $regex: new RegExp(req.query.status, 'i') }, 
+        }).populate({
+            path: "eventsAttendance",
+            model: "Attendance",
+            select: "_id timeIn timeOut",
+            populate: {
+                path: "event",
+                model: "Event",
+                select: "_id eventName",
+            }
         });
         if (members.length) res.json(members); 
         else res.status(200).send(`No matching members found!`);        
@@ -77,6 +86,7 @@ exports.searchMembers = async (req, res, next) => {
         error(res, err);
         next(err);
     }
+    req.app.get('log').emit('logApiEvents', { req, res });
 };
 
 exports.insertMemberValidator = validate([
@@ -103,6 +113,7 @@ exports.insertMember = async (req, res, next) => {
         error(res, err);
         next(err);
     }
+    req.app.get('log').emit('logApiEvents', { req, res });
 };
 
 exports.updateMemberValidator = validate([
@@ -141,6 +152,7 @@ exports.updateMember = async (req, res, next) => {
         error(res, err);
         next(err);
     }
+    req.app.get('log').emit('logApiEvents', { req, res });
 };
 
 exports.deleteMemberValidator = validate([
@@ -170,4 +182,5 @@ exports.deleteMember = async (req, res, next) => {
         error(res, err);
         next(err);
     }
+    req.app.get('log').emit('logApiEvents', { req, res });
 };

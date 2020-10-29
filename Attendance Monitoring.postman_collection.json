@@ -1,7 +1,7 @@
 {
 	"info": {
 		"_postman_id": "a7f50958-c64c-4386-9451-0231f412237c",
-		"name": "Event Monitoring",
+		"name": "Attendance Monitoring",
 		"description": "Node.js Express calls.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},

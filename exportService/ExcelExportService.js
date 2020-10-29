@@ -24,8 +24,7 @@ class ExcelExportService extends BaseExportService{
                 ws.cell(i + 2, 2).string(moment(new Date(data[i].timeIn)).format('hh:mm A'));
                 ws.cell(i + 2, 3).string(data[i].timeOut ? moment(new Date(data[i].timeOut)).format('hh:mm A') : '');                
             }
-            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-            res.setHeader("Content-Disposition", "attachment; filename=" + fileName);
+
             wb.write(fileName, res);
         } catch (err) {
             console.log(`Error exporting data: ${err}`);

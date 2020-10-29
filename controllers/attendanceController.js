@@ -3,29 +3,28 @@ const EventModel = require('../models/eventModel');
 const MemberModel = require('../models/memberModel');
 const moment = require('moment');
 const mongoose = require('mongoose');
-const { body, param, check, query, validationResult } = require('express-validator');
+const { check } = require('express-validator');
 const { validate, error, isDateValid, isDateRangeValid } = require("../common/validators.js");
 
 exports.getAllAttendance = async (req, res, next) => {
-    await AttendanceModel.find({})
-        .populate({
-            path: "member",
-            model: "Member",
-            select: "_id name status",
-        })
-        .populate({
-            path: "event",
-            model: "Event",
-            select: "_id eventName eventType",
-        })
-        .exec(function (err, attendance) {  
-            //err = new Error('test error');            
-            if (err) {
-                error(res, err);
-                next(err);
-            }
-            res.status(200).send(attendance);
-        });
+    try {
+        const attendance = await AttendanceModel.find({})
+            .populate({
+                path: "member",
+                model: "Member",
+                select: "_id name status",
+            })
+            .populate({
+                path: "event",
+                model: "Event",
+                select: "_id eventName eventType",
+            });
+        res.status(200).send(attendance);
+    } catch (err) {
+        error(res, err);
+        next(err);
+    }
+    req.app.get('log').emit('logApiEvents', { req, res });
 };
 
 exports.getByAttendanceIdValidator = validate([
@@ -40,24 +39,24 @@ exports.getByAttendanceIdValidator = validate([
 ]);
 
 exports.getByAttendanceId = async (req, res, next) => {
-	await AttendanceModel.findById(req.params.id)
-        .populate({
-            path: "member",
-            model: "Member",
-            select: "_id name status",
-        })
-        .populate({
-            path: "event",
-            model: "Event",
-            select: "_id eventName eventType",
-        })
-		.exec(function (err, attendance) {
-			if (err) {
-				error(res, err);
-				next(err);
-			}
-			res.status(200).send(attendance);
-		});
+    try {
+        const attendance = await AttendanceModel.findById(req.params.id)
+            .populate({
+                path: "member",
+                model: "Member",
+                select: "_id name status",
+            })
+            .populate({
+                path: "event",
+                model: "Event",
+                select: "_id eventName eventType",
+            });
+        res.status(200).send(attendance);
+    } catch (err) {
+        error(res, err);
+        next(err);
+    }
+    req.app.get('log').emit('logApiEvents', { req, res });
 };
 
 exports.insertAttendanceValidator = validate([
@@ -124,6 +123,7 @@ exports.insertAttendance = async (req, res, next) => {
         error(res, err);
         next(err);
     }
+    req.app.get('log').emit('logApiEvents', { req, res });
 };
 
 exports.updateAttendanceValidator = validate([
@@ -166,6 +166,7 @@ exports.updateAttendance = async (req, res, next) => {
         error(res, err);
         next(err);
     }
+    req.app.get('log').emit('logApiEvents', { req, res });
 };
 
 exports.deleteAttendanceValidator = validate([
@@ -189,4 +190,5 @@ exports.deleteAttendance = async (req, res, next) => {
         error(res, err);
         next(err);
     }
+    req.app.get('log').emit('logApiEvents', { req, res });
 };
